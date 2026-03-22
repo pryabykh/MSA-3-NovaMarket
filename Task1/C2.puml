@@ -1,0 +1,109 @@
+@startuml NovaMarket_C4_Container
+!include ../puml_c4/C4_Container.puml
+
+title C4 Container Diagram: NovaMarket Event-Driven Microservices Architecture
+
+Person(buyer, "Покупатель", "Пользователь мобильного приложения")
+Person(seller, "Продавец", "Получает уведомления о заказах")
+
+System_Boundary(novamarket, "NovaMarket Platform") {
+    Container_Boundary(client, "Client Layer") {
+        Container(mobile_app, "Mobile App", "iOS/Android", "Клиентское приложение для покупателей")
+    }
+
+    Container_Boundary(gateway, "API Gateway Layer") {
+        Container(api_gateway, "API Gateway", "NGINX", "Маршрутизация запросов, аутентификация, rate limiting")
+    }
+
+    Container_Boundary(services, "Microservices Layer") {
+        Container(user_service, "User Service", "Node.js/Go", "Управление профилями пользователей, аутентификация")
+        Container(catalog_service, "Catalog Service", "Node.js/Go", "Каталог товаров, поиск, фильтрация, кэширование")
+        Container(cart_service, "Cart Service", "Node.js/Go", "Управление корзиной покупок")
+        Container(order_service, "Order Service", "Node.js/Go", "Создание и управление заказами, оркестрация")
+        Container(payment_service, "Payment Service", "Node.js/Go", "Обработка платежей, интеграция с платёжными шлюзами")
+        Container(inventory_service, "Inventory Service", "Node.js/Go", "Управление запасами, резервирование товаров")
+        Container(delivery_service, "Delivery Service", "Node.js/Go", "Интеграция с логистическими провайдерами")
+        Container(notification_service, "Notification Service", "Node.js/Go", "Отправка уведомлений покупателям и продавцам")
+    }
+
+    Container_Boundary(infra, "Infrastructure Layer") {
+        Container(message_broker, "Message Broker", "Kafka/RabbitMQ", "Event Bus для асинхронной коммуникации")
+        ContainerDb(catalog_db, "Catalog DB", "PostgreSQL", "Хранение данных каталога товаров")
+        ContainerDb(order_db, "Order DB", "PostgreSQL", "Хранение данных заказов")
+        ContainerDb(user_db, "User DB", "PostgreSQL", "Хранение данных пользователей")
+        ContainerDb(cart_db, "Cart DB", "Redis", "Временное хранение корзин")
+        ContainerDb(inventory_db, "Inventory DB", "PostgreSQL", "Учёт остатков на складах")
+    }
+}
+
+System_Ext(payment_gateway, "Payment Gateway", "Внешний платёжный провайдер")
+System_Ext(logistics_provider, "Logistics Provider", "Внешняя служба доставки")
+
+' === Client to Gateway ===
+Rel(buyer, mobile_app, "Использует")
+Rel(mobile_app, api_gateway, "HTTPS REST/GraphQL")
+
+' === Gateway to Services ===
+Rel(api_gateway, user_service, "API вызовы")
+Rel(api_gateway, catalog_service, "API вызовы")
+Rel(api_gateway, cart_service, "API вызовы")
+Rel(api_gateway, order_service, "API вызовы")
+
+' === Service to Database ===
+Rel(user_service, user_db, "CRUD")
+Rel(catalog_service, catalog_db, "CRUD")
+Rel(order_service, order_db, "CRUD")
+Rel(cart_service, cart_db, "CRUD")
+Rel(inventory_service, inventory_db, "CRUD")
+
+' === Event-Driven Communication ===
+Rel(order_service, message_broker, "Публикует: OrderCreated", "async")
+Rel(order_service, message_broker, "Публикует: OrderConfirmed", "async")
+Rel(order_service, message_broker, "Публикует: OrderCancelled", "async")
+
+Rel(payment_service, message_broker, "Публикует: PaymentProcessed", "async")
+Rel(payment_service, message_broker, "Публикует: PaymentFailed", "async")
+
+Rel(inventory_service, message_broker, "Публикует: InventoryReserved", "async")
+Rel(inventory_service, message_broker, "Публикует: InventoryReleased", "async")
+Rel(inventory_service, message_broker, "Публикует: StockUpdated", "async")
+
+Rel(delivery_service, message_broker, "Публикует: DeliveryRequested", "async")
+Rel(delivery_service, message_broker, "Публикует: DeliveryStatusUpdated", "async")
+
+Rel(notification_service, message_broker, "Subscribe: OrderCreated", "async")
+Rel(notification_service, message_broker, "Subscribe: PaymentProcessed", "async")
+Rel(notification_service, message_broker, "Subscribe: DeliveryStatusUpdated", "async")
+
+' === Service Subscriptions ===
+Rel(message_broker, inventory_service, "Потребляет: OrderCreated", "async")
+Rel(message_broker, payment_service, "Потребляет: OrderConfirmed", "async")
+Rel(message_broker, delivery_service, "Потребляет: PaymentProcessed", "async")
+Rel(message_broker, catalog_service, "Потребляет: StockUpdated", "async")
+
+' === External Integrations ===
+Rel(payment_service, payment_gateway, "API вызовы", "HTTPS")
+Rel(delivery_service, logistics_provider, "API вызовы", "HTTPS")
+
+' === Notifications ===
+Rel(notification_service, seller, "Push/SMS/Email", "Уведомления о заказах")
+Rel(notification_service, buyer, "Push/SMS/Email", "Статусы заказа")
+
+' === Service Descriptions ===
+UpdateElementStyle(user_service, $bgColor="#e3f2fd")
+UpdateElementStyle(catalog_service, $bgColor="#e8f5e9")
+UpdateElementStyle(cart_service, $bgColor="#fff3e0")
+UpdateElementStyle(order_service, $bgColor="#fce4ec")
+UpdateElementStyle(payment_service, $bgColor="#f3e5f5")
+UpdateElementStyle(inventory_service, $bgColor="#e0f7fa")
+UpdateElementStyle(delivery_service, $bgColor="#fff8e1")
+UpdateElementStyle(notification_service, $bgColor="#e8eaf6")
+UpdateElementStyle(message_broker, $bgColor="#ffcc80", $fontColor="#000000")
+
+UpdateRelStyle(order_service, message_broker, $lineColor="#666666", $lineStyle="dashed")
+UpdateRelStyle(message_broker, inventory_service, $lineColor="#666666", $lineStyle="dashed")
+UpdateRelStyle(message_broker, payment_service, $lineColor="#666666", $lineStyle="dashed")
+UpdateRelStyle(message_broker, delivery_service, $lineColor="#666666", $lineStyle="dashed")
+UpdateRelStyle(message_broker, notification_service, $lineColor="#666666", $lineStyle="dashed")
+
+@enduml
