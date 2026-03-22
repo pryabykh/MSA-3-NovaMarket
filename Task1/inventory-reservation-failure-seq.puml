@@ -1,0 +1,40 @@
+@startuml NovaMarket_Order_Saga_Inventory_Failure
+title Sequence Diagram: Inventory Reservation Failure (Compensation Flow)
+
+actor Buyer as buyer
+participant "Mobile App" as app
+participant "API Gateway" as gateway
+participant "Order Service" as order
+participant "Inventory Service" as inventory
+participant "Notification Service" as notification
+participant "Message Broker" as broker
+
+== Step 1: Create Order ==
+buyer -> app: Оформить заказ
+app -> gateway: POST /orders
+gateway -> order: CreateOrderCommand
+order -> broker: Publish OrderCreated
+order --> gateway: OrderCreated (201)
+gateway --> app: Order ID
+
+== Step 2: Inventory Reservation Fails ==
+broker -> inventory: Consume OrderCreated
+inventory -> inventory: Check availability
+note over inventory: Товар недоступен\nна складе
+inventory -> broker: Publish InventoryReservationFailed
+
+== Step 3: Cancel Order ==
+broker -> order: Consume InventoryReservationFailed
+order -> order: Update status to CANCELLED
+order -> broker: Publish OrderCancelled
+
+== Step 4: Notify Buyer ==
+broker -> notification: Consume InventoryReservationFailed
+notification -> buyer: Push: Товар недоступен
+broker -> notification: Consume OrderCancelled
+notification -> buyer: Push: Заказ отменён
+notification -> broker: Publish NotificationSent
+
+note over buyer, broker: Order cancelled - items not available
+
+@enduml

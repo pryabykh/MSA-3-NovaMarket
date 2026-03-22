@@ -1,0 +1,56 @@
+@startuml NovaMarket_Order_Saga_Success
+title Sequence Diagram: Successful Order Placement (Happy Path)
+
+actor Buyer as buyer
+participant "Mobile App" as app
+participant "API Gateway" as gateway
+participant "Order Service" as order
+participant "Inventory Service" as inventory
+participant "Payment Service" as payment
+participant "Delivery Service" as delivery
+participant "Notification Service" as notification
+participant "Message Broker" as broker
+participant "Payment Gateway" as pgateway
+participant "Logistics Provider" as logistics
+
+== Step 1: Create Order ==
+buyer -> app: Оформить заказ
+app -> gateway: POST /orders
+gateway -> order: CreateOrderCommand
+order -> order: Validate order data
+order -> broker: Publish OrderCreated
+order --> gateway: OrderCreated (201)
+gateway --> app: Order ID
+app --> buyer: Заказ создан
+
+== Step 2: Reserve Inventory ==
+broker -> inventory: Consume OrderCreated
+inventory -> inventory: Check availability
+inventory -> inventory: Reserve items
+inventory -> broker: Publish InventoryReserved
+inventory --> order: InventoryReserved
+
+== Step 3: Process Payment ==
+broker -> payment: Consume InventoryReserved
+payment -> pgateway: ProcessPayment()
+pgateway --> payment: PaymentSuccess
+payment -> broker: Publish PaymentProcessed
+payment --> order: PaymentProcessed
+
+== Step 4: Request Delivery ==
+broker -> delivery: Consume PaymentProcessed
+delivery -> logistics: CreateDeliveryRequest()
+logistics --> delivery: DeliveryAccepted
+delivery -> broker: Publish DeliveryRequested
+delivery --> order: DeliveryRequested
+
+== Step 5: Complete Order ==
+order -> order: Update status to COMPLETED
+order -> broker: Publish OrderCompleted
+broker -> notification: Consume OrderCompleted
+notification -> buyer: Push: Заказ оформлен
+notification -> broker: Publish NotificationSent
+
+note over buyer, logistics: Order successfully completed!
+
+@enduml

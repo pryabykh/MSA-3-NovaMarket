@@ -1,0 +1,65 @@
+@startuml NovaMarket_Order_Saga_Delivery_Failure
+title Sequence Diagram: Delivery Request Failure (Full Compensation Flow)
+
+actor Buyer as buyer
+participant "Mobile App" as app
+participant "API Gateway" as gateway
+participant "Order Service" as order
+participant "Inventory Service" as inventory
+participant "Payment Service" as payment
+participant "Delivery Service" as delivery
+participant "Notification Service" as notification
+participant "Message Broker" as broker
+participant "Payment Gateway" as pgateway
+participant "Logistics Provider" as logistics
+
+== Step 1-3: Order Created, Inventory Reserved, Payment Processed ==
+buyer -> app: Оформить заказ
+app -> gateway: POST /orders
+gateway -> order: CreateOrderCommand
+order -> broker: Publish OrderCreated
+order --> gateway: OrderCreated (201)
+
+broker -> inventory: Consume OrderCreated
+inventory -> inventory: Reserve items
+inventory -> broker: Publish InventoryReserved
+
+broker -> payment: Consume InventoryReserved
+payment -> pgateway: ProcessPayment()
+pgateway --> payment: PaymentSuccess
+payment -> broker: Publish PaymentProcessed
+
+== Step 4: Delivery Request Fails ==
+broker -> delivery: Consume PaymentProcessed
+delivery -> logistics: CreateDeliveryRequest()
+logistics --> delivery: DeliveryRejected\n(Address unavailable)
+delivery -> broker: Publish DeliveryRequestFailed
+
+== Step 5: Compensation - Refund Payment ==
+broker -> payment: Consume DeliveryRequestFailed
+payment -> pgateway: RefundPayment()
+pgateway --> payment: RefundSuccess
+payment -> broker: Publish PaymentRefunded
+
+== Step 6: Compensation - Release Inventory ==
+broker -> inventory: Consume PaymentRefunded
+inventory -> inventory: Release reservation
+inventory -> broker: Publish InventoryReleased
+
+== Step 7: Cancel Order ==
+broker -> order: Consume DeliveryRequestFailed
+order -> order: Update status to CANCELLED
+order -> broker: Publish OrderCancelled
+
+== Step 8: Notify Buyer ==
+broker -> notification: Consume DeliveryRequestFailed
+notification -> buyer: Push: Доставка невозможна
+broker -> notification: Consume PaymentRefunded
+notification -> buyer: Push: Средства возвращены
+broker -> notification: Consume OrderCancelled
+notification -> buyer: Push: Заказ отменён
+notification -> broker: Publish NotificationSent
+
+note over buyer, logistics: Order cancelled - delivery unavailable\nFull refund processed
+
+@enduml
