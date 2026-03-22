@@ -56,30 +56,56 @@ Rel(order_service, order_db, "CRUD")
 Rel(cart_service, cart_db, "CRUD")
 Rel(inventory_service, inventory_db, "CRUD")
 
-' === Event-Driven Communication ===
-Rel(order_service, message_broker, "Публикует: OrderCreated", "async")
-Rel(order_service, message_broker, "Публикует: OrderConfirmed", "async")
-Rel(order_service, message_broker, "Публикует: OrderCancelled", "async")
+' === Event-Driven Communication - Order Service ===
+Rel(order_service, message_broker, "Публикует: OrderCreated\n(domain)", "async")
+Rel(order_service, message_broker, "Публикует: OrderCreationFailed\n(failure)", "async")
+Rel(order_service, message_broker, "Публикует: OrderCancelled\n(compensation)", "async")
+Rel(order_service, message_broker, "Публикует: OrderCompleted\n(domain)", "async")
 
-Rel(payment_service, message_broker, "Публикует: PaymentProcessed", "async")
-Rel(payment_service, message_broker, "Публикует: PaymentFailed", "async")
+' === Event-Driven Communication - Payment Service ===
+Rel(payment_service, message_broker, "Публикует: PaymentProcessed\n(domain)", "async")
+Rel(payment_service, message_broker, "Публикует: PaymentFailed\n(failure)", "async")
+Rel(payment_service, message_broker, "Публикует: PaymentRefunded\n(compensation)", "async")
 
-Rel(inventory_service, message_broker, "Публикует: InventoryReserved", "async")
-Rel(inventory_service, message_broker, "Публикует: InventoryReleased", "async")
-Rel(inventory_service, message_broker, "Публикует: StockUpdated", "async")
+' === Event-Driven Communication - Inventory Service ===
+Rel(inventory_service, message_broker, "Публикует: InventoryReserved\n(domain)", "async")
+Rel(inventory_service, message_broker, "Публикует: InventoryReservationFailed\n(failure)", "async")
+Rel(inventory_service, message_broker, "Публикует: InventoryReleased\n(compensation)", "async")
+Rel(inventory_service, message_broker, "Публикует: StockUpdated\n(domain)", "async")
 
-Rel(delivery_service, message_broker, "Публикует: DeliveryRequested", "async")
-Rel(delivery_service, message_broker, "Публикует: DeliveryStatusUpdated", "async")
+' === Event-Driven Communication - Delivery Service ===
+Rel(delivery_service, message_broker, "Публикует: DeliveryRequested\n(domain)", "async")
+Rel(delivery_service, message_broker, "Публикует: DeliveryRequestFailed\n(failure)", "async")
+Rel(delivery_service, message_broker, "Публикует: DeliveryCancelled\n(compensation)", "async")
+Rel(delivery_service, message_broker, "Публикует: DeliveryStatusUpdated\n(domain)", "async")
 
+' === Event-Driven Communication - Notification Service ===
 Rel(notification_service, message_broker, "Subscribe: OrderCreated", "async")
+Rel(notification_service, message_broker, "Subscribe: OrderCompleted", "async")
+Rel(notification_service, message_broker, "Subscribe: OrderCancelled", "async")
 Rel(notification_service, message_broker, "Subscribe: PaymentProcessed", "async")
+Rel(notification_service, message_broker, "Subscribe: PaymentFailed", "async")
 Rel(notification_service, message_broker, "Subscribe: DeliveryStatusUpdated", "async")
+Rel(notification_service, message_broker, "Публикует: NotificationSent\n(domain)", "async")
 
-' === Service Subscriptions ===
+' === Service Subscriptions (Saga Choreography) ===
 Rel(message_broker, inventory_service, "Потребляет: OrderCreated", "async")
-Rel(message_broker, payment_service, "Потребляет: OrderConfirmed", "async")
+Rel(message_broker, order_service, "Потребляет: InventoryReserved", "async")
+Rel(message_broker, order_service, "Потребляет: InventoryReservationFailed", "async")
+Rel(message_broker, payment_service, "Потребляет: InventoryReserved", "async")
+Rel(message_broker, order_service, "Потребляет: PaymentProcessed", "async")
+Rel(message_broker, order_service, "Потребляет: PaymentFailed", "async")
 Rel(message_broker, delivery_service, "Потребляет: PaymentProcessed", "async")
+Rel(message_broker, order_service, "Потребляет: DeliveryRequested", "async")
+Rel(message_broker, order_service, "Потребляет: DeliveryRequestFailed", "async")
 Rel(message_broker, catalog_service, "Потребляет: StockUpdated", "async")
+
+' === Compensation Flow Subscriptions ===
+Rel(message_broker, inventory_service, "Потребляет: OrderCancelled", "async")
+Rel(message_broker, payment_service, "Потребляет: OrderCancelled", "async")
+Rel(message_broker, delivery_service, "Потребляет: OrderCancelled", "async")
+Rel(message_broker, inventory_service, "Потребляет: PaymentFailed", "async")
+Rel(message_broker, payment_service, "Потребляет: InventoryReservationFailed", "async")
 
 ' === External Integrations ===
 Rel(payment_service, payment_gateway, "API вызовы", "HTTPS")
@@ -101,9 +127,15 @@ UpdateElementStyle(notification_service, $bgColor="#e8eaf6")
 UpdateElementStyle(message_broker, $bgColor="#ffcc80", $fontColor="#000000")
 
 UpdateRelStyle(order_service, message_broker, $lineColor="#666666", $lineStyle="dashed")
+UpdateRelStyle(payment_service, message_broker, $lineColor="#666666", $lineStyle="dashed")
+UpdateRelStyle(inventory_service, message_broker, $lineColor="#666666", $lineStyle="dashed")
+UpdateRelStyle(delivery_service, message_broker, $lineColor="#666666", $lineStyle="dashed")
+UpdateRelStyle(notification_service, message_broker, $lineColor="#666666", $lineStyle="dashed")
 UpdateRelStyle(message_broker, inventory_service, $lineColor="#666666", $lineStyle="dashed")
 UpdateRelStyle(message_broker, payment_service, $lineColor="#666666", $lineStyle="dashed")
 UpdateRelStyle(message_broker, delivery_service, $lineColor="#666666", $lineStyle="dashed")
+UpdateRelStyle(message_broker, order_service, $lineColor="#666666", $lineStyle="dashed")
 UpdateRelStyle(message_broker, notification_service, $lineColor="#666666", $lineStyle="dashed")
+UpdateRelStyle(message_broker, catalog_service, $lineColor="#666666", $lineStyle="dashed")
 
 @enduml
