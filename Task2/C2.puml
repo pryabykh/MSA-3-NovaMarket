@@ -1,0 +1,194 @@
+@startuml NovaMarket_C4_Container_OrderHistory
+!include ../puml_c4/C4_Container.puml
+
+title C4 Container Diagram: NovaMarket - Order History Feature
+
+Person(buyer, "Покупатель", "Пользователь мобильного приложения")
+Person(seller, "Продавец", "Получает уведомления о заказах")
+
+System_Boundary(novamarket, "NovaMarket Platform") {
+    Container_Boundary(client, "Client Layer") {
+        Container(mobile_app, "Mobile App", "iOS/Android", "Клиентское приложение для покупателей")
+    }
+
+    Container_Boundary(gateway, "API Gateway Layer") {
+        Container(api_gateway, "API Gateway", "NGINX", "Маршрутизация запросов, аутентификация, rate limiting")
+        Container(bff, "BFF - Backend for Frontend", "Node.js/Go", "Агрегация данных для мобильного приложения")
+    }
+
+    Container_Boundary(services, "Microservices Layer") {
+        Container(user_service, "User Service", "Node.js/Go", "Управление профилями пользователей, аутентификация")
+        Container(catalog_service, "Catalog Service", "Node.js/Go", "Каталог товаров, поиск, фильтрация, кэширование")
+        Container(cart_service, "Cart Service", "Node.js/Go", "Управление корзиной покупок")
+        Container(order_service, "Order Service", "Node.js/Go", "Создание и управление заказами, оркестрация")
+        Container(order_history_service, "Order History Service", "Node.js/Go", "Чтение истории заказов (CQRS Read Model)")
+        Container(payment_service, "Payment Service", "Node.js/Go", "Обработка платежей, интеграция с платёжными шлюзами")
+        Container(inventory_service, "Inventory Service", "Node.js/Go", "Управление запасами, резервирование товаров")
+        Container(delivery_service, "Delivery Service", "Node.js/Go", "Интеграция с логистическими провайдерами")
+        Container(notification_service, "Notification Service", "Node.js/Go", "Отправка уведомлений покупателям и продавцам")
+        Container(review_service, "Review Service", "Node.js/Go", "Управление отзывами о товарах")
+        Container(receipt_service, "Receipt Service", "Node.js/Go", "Генерация и хранение чеков")
+    }
+
+    Container_Boundary(infra, "Infrastructure Layer") {
+        Container(message_broker, "Message Broker", "Kafka/RabbitMQ", "Event Bus для асинхронной коммуникации")
+        ContainerDb(catalog_db, "Catalog DB", "PostgreSQL", "Хранение данных каталога товаров")
+        ContainerDb(order_db, "Order DB", "PostgreSQL", "Хранение данных заказов (write model)")
+        ContainerDb(order_history_db, "Order History DB", "Elasticsearch/MongoDB", "Денормализованные данные для быстрого чтения истории")
+        ContainerDb(user_db, "User DB", "PostgreSQL", "Хранение данных пользователей")
+        ContainerDb(cart_db, "Cart DB", "Redis", "Временное хранение корзин")
+        ContainerDb(inventory_db, "Inventory DB", "PostgreSQL", "Учёт остатков на складах")
+        ContainerDb(review_db, "Review DB", "PostgreSQL", "Хранение отзывов о товарах")
+        ContainerDb(receipt_db, "Receipt DB", "PostgreSQL + S3", "Хранение чеков (PDF)")
+        Container(cache, "Cache Layer", "Redis", "Кэширование частых запросов истории заказов")
+    }
+}
+
+System_Ext(payment_gateway, "Payment Gateway", "Внешний платёжный провайдер")
+System_Ext(logistics_provider, "Logistics Provider", "Внешняя служба доставки")
+
+' === Client to Gateway ===
+Rel(buyer, mobile_app, "Использует")
+Rel(mobile_app, api_gateway, "HTTPS REST/GraphQL")
+Rel(mobile_app, bff, "HTTPS REST/GraphQL", "Запросы истории заказов")
+
+' === Gateway to Services ===
+Rel(api_gateway, user_service, "API вызовы")
+Rel(api_gateway, catalog_service, "API вызовы")
+Rel(api_gateway, cart_service, "API вызовы")
+Rel(api_gateway, order_service, "API вызовы")
+Rel(bff, order_history_service, "API вызовы", "GET /orders/history")
+Rel(bff, review_service, "API вызовы", "POST /reviews")
+Rel(bff, receipt_service, "API вызовы", "GET /receipts")
+Rel(bff, catalog_service, "API вызовы", "GET /products (для re-order)")
+
+' === Service to Database ===
+Rel(user_service, user_db, "CRUD")
+Rel(catalog_service, catalog_db, "CRUD")
+Rel(order_service, order_db, "CRUD")
+Rel(order_history_service, order_history_db, "CRUD")
+Rel(order_history_service, cache, "Read/Write", "Кэширование")
+Rel(cart_service, cart_db, "CRUD")
+Rel(inventory_service, inventory_db, "CRUD")
+Rel(review_service, review_db, "CRUD")
+Rel(receipt_service, receipt_db, "CRUD")
+
+' === Event-Driven Communication - Order Service ===
+Rel(order_service, message_broker, "Публикует: OrderCreated\n(domain)", "async")
+Rel(order_service, message_broker, "Публикует: OrderCreationFailed\n(failure)", "async")
+Rel(order_service, message_broker, "Публикует: OrderCancelled\n(compensation)", "async")
+Rel(order_service, message_broker, "Публикует: OrderCompleted\n(domain)", "async")
+
+' === Event-Driven Communication - Payment Service ===
+Rel(payment_service, message_broker, "Публикует: PaymentProcessed\n(domain)", "async")
+Rel(payment_service, message_broker, "Публикует: PaymentFailed\n(failure)", "async")
+Rel(payment_service, message_broker, "Публикует: PaymentRefunded\n(compensation)", "async")
+
+' === Event-Driven Communication - Inventory Service ===
+Rel(inventory_service, message_broker, "Публикует: InventoryReserved\n(domain)", "async")
+Rel(inventory_service, message_broker, "Публикует: InventoryReservationFailed\n(failure)", "async")
+Rel(inventory_service, message_broker, "Публикует: InventoryReleased\n(compensation)", "async")
+Rel(inventory_service, message_broker, "Публикует: StockUpdated\n(domain)", "async")
+
+' === Event-Driven Communication - Delivery Service ===
+Rel(delivery_service, message_broker, "Публикует: DeliveryRequested\n(domain)", "async")
+Rel(delivery_service, message_broker, "Публикует: DeliveryRequestFailed\n(failure)", "async")
+Rel(delivery_service, message_broker, "Публикует: DeliveryCancelled\n(compensation)", "async")
+Rel(delivery_service, message_broker, "Публикует: DeliveryStatusUpdated\n(domain)", "async")
+
+' === Event-Driven Communication - Order History Service (CQRS) ===
+Rel(order_history_service, message_broker, "Потребляет: OrderCreated", "async")
+Rel(order_history_service, message_broker, "Потребляет: OrderCompleted", "async")
+Rel(order_history_service, message_broker, "Потребляет: OrderCancelled", "async")
+Rel(order_history_service, message_broker, "Потребляет: PaymentProcessed", "async")
+Rel(order_history_service, message_broker, "Потребляет: DeliveryStatusUpdated", "async")
+Rel(order_history_service, message_broker, "Публикует: OrderHistoryUpdated\n(domain)", "async")
+
+' === Event-Driven Communication - Notification Service ===
+Rel(notification_service, message_broker, "Subscribe: OrderCreated", "async")
+Rel(notification_service, message_broker, "Subscribe: OrderCompleted", "async")
+Rel(notification_service, message_broker, "Subscribe: OrderCancelled", "async")
+Rel(notification_service, message_broker, "Subscribe: PaymentProcessed", "async")
+Rel(notification_service, message_broker, "Subscribe: PaymentFailed", "async")
+Rel(notification_service, message_broker, "Subscribe: DeliveryStatusUpdated", "async")
+Rel(notification_service, message_broker, "Публикует: NotificationSent\n(domain)", "async")
+
+' === Event-Driven Communication - Receipt Service ===
+Rel(receipt_service, message_broker, "Потребляет: PaymentProcessed", "async")
+Rel(receipt_service, message_broker, "Публикует: ReceiptGenerated\n(domain)", "async")
+
+' === Service Subscriptions (Saga Choreography) ===
+Rel(message_broker, inventory_service, "Потребляет: OrderCreated", "async")
+Rel(message_broker, order_service, "Потребляет: InventoryReserved", "async")
+Rel(message_broker, order_service, "Потребляет: InventoryReservationFailed", "async")
+Rel(message_broker, payment_service, "Потребляет: InventoryReserved", "async")
+Rel(message_broker, order_service, "Потребляет: PaymentProcessed", "async")
+Rel(message_broker, order_service, "Потребляет: PaymentFailed", "async")
+Rel(message_broker, delivery_service, "Потребляет: PaymentProcessed", "async")
+Rel(message_broker, order_service, "Потребляет: DeliveryRequested", "async")
+Rel(message_broker, order_service, "Потребляет: DeliveryRequestFailed", "async")
+Rel(message_broker, catalog_service, "Потребляет: StockUpdated", "async")
+
+' === Compensation Flow Subscriptions ===
+Rel(message_broker, inventory_service, "Потребляет: OrderCancelled", "async")
+Rel(message_broker, payment_service, "Потребляет: OrderCancelled", "async")
+Rel(message_broker, delivery_service, "Потребляет: OrderCancelled", "async")
+Rel(message_broker, inventory_service, "Потребляет: PaymentFailed", "async")
+Rel(message_broker, payment_service, "Потребляет: InventoryReservationFailed", "async")
+
+' === External Integrations ===
+Rel(payment_service, payment_gateway, "API вызовы", "HTTPS")
+Rel(delivery_service, logistics_provider, "API вызовы", "HTTPS")
+
+' === Notifications ===
+Rel(notification_service, seller, "Push/SMS/Email", "Уведомления о заказах")
+Rel(notification_service, buyer, "Push/SMS/Email", "Статусы заказа")
+
+' === Service Descriptions ===
+UpdateElementStyle(user_service, $bgColor="#e3f2fd")
+UpdateElementStyle(catalog_service, $bgColor="#e8f5e9")
+UpdateElementStyle(cart_service, $bgColor="#fff3e0")
+UpdateElementStyle(order_service, $bgColor="#fce4ec")
+UpdateElementStyle(order_history_service, $bgColor="#fff9c4", $borderColor="#fbc02d")
+UpdateElementStyle(payment_service, $bgColor="#f3e5f5")
+UpdateElementStyle(inventory_service, $bgColor="#e0f7fa")
+UpdateElementStyle(delivery_service, $bgColor="#fff8e1")
+UpdateElementStyle(notification_service, $bgColor="#e8eaf6")
+UpdateElementStyle(review_service, $bgColor="#e1f5fe", $borderColor="#039be5")
+UpdateElementStyle(receipt_service, $bgColor="#f1f8e9", $borderColor="#7cb342")
+UpdateElementStyle(message_broker, $bgColor="#ffcc80", $fontColor="#000000")
+UpdateElementStyle(bff, $bgColor="#bbdefb", $borderColor="#1976d2")
+UpdateElementStyle(cache, $bgColor="#ffe0b2", $borderColor="#f57c00")
+UpdateElementStyle(order_history_db, $bgColor="#c8e6c9", $borderColor="#388e3c")
+
+UpdateRelStyle(order_service, message_broker, $lineColor="#666666", $lineStyle="dashed")
+UpdateRelStyle(payment_service, message_broker, $lineColor="#666666", $lineStyle="dashed")
+UpdateRelStyle(inventory_service, message_broker, $lineColor="#666666", $lineStyle="dashed")
+UpdateRelStyle(delivery_service, message_broker, $lineColor="#666666", $lineStyle="dashed")
+UpdateRelStyle(notification_service, message_broker, $lineColor="#666666", $lineStyle="dashed")
+UpdateRelStyle(message_broker, inventory_service, $lineColor="#666666", $lineStyle="dashed")
+UpdateRelStyle(message_broker, payment_service, $lineColor="#666666", $lineStyle="dashed")
+UpdateRelStyle(message_broker, delivery_service, $lineColor="#666666", $lineStyle="dashed")
+UpdateRelStyle(message_broker, order_service, $lineColor="#666666", $lineStyle="dashed")
+UpdateRelStyle(message_broker, notification_service, $lineColor="#666666", $lineStyle="dashed")
+UpdateRelStyle(message_broker, catalog_service, $lineColor="#666666", $lineStyle="dashed")
+UpdateRelStyle(message_broker, order_history_service, $lineColor="#fbc02d", $lineStyle="dashed", $textColor="#fbc02d")
+UpdateRelStyle(message_broker, receipt_service, $lineColor="#7cb342", $lineStyle="dashed", $textColor="#7cb342")
+UpdateRelStyle(bff, order_history_service, $lineColor="#1976d2", $textColor="#1976d2")
+
+note right of order_history_service
+  <b>CQRS Read Model</b>
+  - Денормализованные данные
+  - Оптимизировано для чтения
+  - Кэширование в Redis
+  - Отклик < 0.3 сек (98%)
+end note
+
+note right of bff
+  <b>Backend for Frontend</b>
+  - Агрегация данных из нескольких сервисов
+  - Один запрос вместо множественных
+  - Специфично для мобильного клиента
+end note
+
+@enduml
