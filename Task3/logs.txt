@@ -1,0 +1,34 @@
+NAME               REFERENCE                 TARGETS           MINPODS   MAXPODS   REPLICAS   AGE
+scaletestapp-hpa   Deployment/scaletestapp   memory: 60%/80%   1         10        1          23m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 57%/80%   1         10        1          24m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 62%/80%   1         10        1          25m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 61%/80%   1         10        1          26m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 70%/80%   1         10        1          27m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 74%/80%   1         10        1          28m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 73%/80%   1         10        1          29m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 75%/80%   1         10        1          30m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 78%/80%   1         10        1          31m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 82%/80%   1         10        1          32m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 80%/80%   1         10        1          33m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 86%/80%   1         10        1          34m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 90%/80%   1         10        1          35m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 90%/80%   1         10        2          35m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 73%/80%   1         10        2          36m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 75%/80%   1         10        2          37m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 78%/80%   1         10        2          38m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 79%/80%   1         10        2          39m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 78%/80%   1         10        2          40m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 80%/80%   1         10        2          41m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 82%/80%   1         10        2          42m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 82%/80%   1         10        2          43m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 83%/80%   1         10        2          44m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 84%/80%   1         10        2          45m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 85%/80%   1         10        2          46m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 86%/80%   1         10        2          47m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 88%/80%   1         10        2          48m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 88%/80%   1         10        2          49m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 89%/80%   1         10        2          50m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 89%/80%   1         10        3          50m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 78%/80%   1         10        3          51m
+scaletestapp-hpa   Deployment/scaletestapp   memory: 79%/80%   1         10        3          52m
+
