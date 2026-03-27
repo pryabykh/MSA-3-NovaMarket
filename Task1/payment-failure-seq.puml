@@ -1,0 +1,55 @@
+@startuml NovaMarket_Order_Saga_Payment_Failure
+title Sequence Diagram: Payment Failure (Compensation Flow)
+
+actor Buyer as buyer
+participant "Mobile App" as app
+participant "API Gateway" as gateway
+participant "Order Service" as order
+participant "Inventory Service" as inventory
+participant "Payment Service" as payment
+participant "Notification Service" as notification
+participant "Message Broker" as broker
+participant "Payment Gateway" as pgateway
+
+== Step 1: Create Order ==
+buyer -> app: Оформить заказ
+app -> gateway: POST /orders
+gateway -> order: CreateOrderCommand
+order -> broker: Publish OrderCreated
+order --> gateway: OrderCreated (201)
+gateway --> app: Order ID
+
+== Step 2: Reserve Inventory ==
+broker -> inventory: Consume OrderCreated
+inventory -> inventory: Check availability
+inventory -> inventory: Reserve items
+inventory -> broker: Publish InventoryReserved
+inventory --> order: InventoryReserved
+
+== Step 3: Payment Fails ==
+broker -> payment: Consume InventoryReserved
+payment -> pgateway: ProcessPayment()
+pgateway --> payment: PaymentDeclined\n(Insufficient funds)
+payment -> broker: Publish PaymentFailed
+
+== Step 4: Compensation - Release Inventory ==
+broker -> inventory: Consume PaymentFailed
+inventory -> inventory: Release reservation
+inventory -> broker: Publish InventoryReleased
+inventory --> order: InventoryReleased
+
+== Step 5: Cancel Order ==
+broker -> order: Consume PaymentFailed
+order -> order: Update status to CANCELLED
+order -> broker: Publish OrderCancelled
+
+== Step 6: Notify Buyer ==
+broker -> notification: Consume PaymentFailed
+notification -> buyer: Push: Оплата не прошла
+broker -> notification: Consume OrderCancelled
+notification -> buyer: Push: Заказ отменён
+notification -> broker: Publish NotificationSent
+
+note over buyer, broker: Order cancelled due to payment failure\nInventory released
+
+@enduml
